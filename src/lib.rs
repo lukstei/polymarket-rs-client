@@ -6,7 +6,6 @@ pub use anyhow::{anyhow, Context, Result as ClientResult};
 use config::get_contract_config;
 use orders::OrderBuilder;
 use orders::SignedOrderRequest;
-use reqwest::header::HeaderName;
 use reqwest::Client;
 use reqwest::Method;
 use reqwest::RequestBuilder;
@@ -125,11 +124,7 @@ impl ClobClient {
             .http_client
             .request(method, format!("{}{endpoint}", &self.host));
 
-        headers.fold(req, |r, (k, v)| {
-            // Use from_bytes to support uppercase header names
-            let header_name = HeaderName::from_bytes(k.as_bytes()).expect("Invalid header name");
-            r.header(header_name, v)
-        })
+        headers.fold(req, |r, (k, v)| r.header(k, v))
     }
 
     pub async fn get_ok(&self) -> bool {
@@ -642,7 +637,7 @@ impl ClobClient {
             let r = headers
                 .clone()
                 .into_iter()
-                .fold(req, |r, (k, v)| r.header(HeaderName::from_static(k), v));
+                .fold(req, |r, (k, v)| r.header(k, v));
 
             let resp = r.send().await?.json::<Value>().await?;
             let new_cursor = resp["next_cursor"]
@@ -727,7 +722,7 @@ impl ClobClient {
             let r = headers
                 .clone()
                 .into_iter()
-                .fold(req, |r, (k, v)| r.header(HeaderName::from_static(k), v));
+                .fold(req, |r, (k, v)| r.header(k, v));
 
             let resp = r.send().await?.json::<Value>().await?;
             let new_cursor = resp["next_cursor"]
