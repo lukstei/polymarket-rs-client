@@ -678,7 +678,7 @@ impl ClobClient {
                 .http_client
                 .request(method.clone(), format!("{}{endpoint}", &self.host))
                 .query(&query_params)
-                .query(&["next_cursor", &next_cursor]);
+                .query(&[("next_cursor", &next_cursor)]);
 
             let r = headers
                 .clone()
@@ -759,16 +759,16 @@ impl ClobClient {
 
         let mut output = Vec::new();
         while next_cursor != END_CURSOR {
-            let req = self
-                .http_client
+        let req = self
+            .http_client
                 .request(method.clone(), format!("{}{endpoint}", &self.host))
                 .query(&query_params)
                 .query(&["next_cursor", &next_cursor]);
 
-            let r = headers
+        let r = headers
                 .clone()
-                .into_iter()
-                .fold(req, |r, (k, v)| r.header(k, v));
+            .into_iter()
+            .fold(req, |r, (k, v)| r.header(k, v));
 
             let resp = r.send().await?.json::<Value>().await?;
             let new_cursor = resp["next_cursor"]
