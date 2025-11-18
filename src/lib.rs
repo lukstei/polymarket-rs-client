@@ -1,5 +1,6 @@
 use alloy_primitives::hex::encode_prefixed;
 pub use alloy_primitives::U256;
+use alloy_signer::Signer;
 use alloy_signer_local::PrivateKeySigner;
 pub use anyhow::{anyhow, Context, Result as ClientResult};
 use config::get_contract_config;
@@ -124,7 +125,11 @@ impl ClobClient {
             .http_client
             .request(method, format!("{}{endpoint}", &self.host));
 
-        headers.fold(req, |r, (k, v)| r.header(HeaderName::from_static(k), v))
+        headers.fold(req, |r, (k, v)| {
+            // Use from_bytes to support uppercase header names
+            let header_name = HeaderName::from_bytes(k.as_bytes()).expect("Invalid header name");
+            r.header(header_name, v)
+        })
     }
 
     pub async fn get_ok(&self) -> bool {
@@ -489,6 +494,7 @@ impl ClobClient {
         order_type: OrderType,
     ) -> ClientResult<Value> {
         let (signer, creds) = self.get_l2_parameters();
+        // Use API key as owner (as per original implementation)
         let body = PostOrder::new(order, creds.api_key.clone(), order_type);
 
         let method = Method::POST;

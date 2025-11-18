@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use base64::{engine::general_purpose::URL_SAFE, Engine};
 use serde::Serialize;
-use serde_json_fmt::JsonFormat;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use hmac::{Hmac, Mac};
@@ -32,11 +31,8 @@ where
     let message = match body {
         None => format!("{timestamp}{method}{req_path}"),
         Some(s) => {
-            // We format like str(dict) in python
-            let s = JsonFormat::new()
-                .comma(", ")?
-                .colon(": ")?
-                .format_to_string(&s)?;
+            // Use compact JSON (no spaces) like standard JSON.stringify
+            let s = serde_json::to_string(&s).context("Failed to serialize body")?;
             format!("{timestamp}{method}{req_path}{s}")
         }
     };
