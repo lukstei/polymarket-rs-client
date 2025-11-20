@@ -7,12 +7,12 @@ use anyhow::Result;
 use serde::Serialize;
 use std::collections::HashMap;
 
-const POLY_ADDR_HEADER: &str = "POLY-ADDRESS";
-const POLY_SIG_HEADER: &str = "POLY-SIGNATURE";
-const POLY_TS_HEADER: &str = "POLY-TIMESTAMP";
-const POLY_NONCE_HEADER: &str = "POLY-NONCE";
-const POLY_API_KEY_HEADER: &str = "POLY-API-KEY";
-const POLY_PASS_HEADER: &str = "POLY-PASSPHRASE";
+const POLY_ADDR_HEADER: &str = "POLY_ADDRESS";
+const POLY_SIG_HEADER: &str = "POLY_SIGNATURE";
+const POLY_TS_HEADER: &str = "POLY_TIMESTAMP";
+const POLY_NONCE_HEADER: &str = "POLY_NONCE";
+const POLY_API_KEY_HEADER: &str = "POLY_API_KEY";
+const POLY_PASS_HEADER: &str = "POLY_PASSPHRASE";
 
 //TODO: Heapless for maps!
 type Headers = HashMap<&'static str, String>;

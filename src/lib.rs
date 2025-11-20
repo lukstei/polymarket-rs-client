@@ -396,12 +396,9 @@ impl ClobClient {
             None => (None, None),
         };
 
-        let tick_size = self.resolve_tick_size(token_id, tick_size).await?;
+        let tick_size = tick_size.unwrap();//self.resolve_tick_size(token_id, tick_size).await?;
 
-        let neg_risk = match neg_risk {
-            Some(nr) => nr,
-            None => self.get_neg_risk(token_id).await?,
-        };
+        let neg_risk = neg_risk.unwrap();
 
         Ok(CreateOrderOptions {
             neg_risk: Some(neg_risk),
@@ -763,7 +760,7 @@ impl ClobClient {
             .http_client
                 .request(method.clone(), format!("{}{endpoint}", &self.host))
                 .query(&query_params)
-                .query(&["next_cursor", &next_cursor]);
+                .query(&[("next_cursor", &next_cursor)]);
 
         let r = headers
                 .clone()
@@ -773,7 +770,7 @@ impl ClobClient {
             let resp = r.send().await?.json::<Value>().await?;
             let new_cursor = resp["next_cursor"]
                 .as_str()
-                .expect("Failed to parse next cursor")
+                .expect(&format!("Failed to parse next cursor: {resp}"))
                 .to_owned();
 
             next_cursor = new_cursor;
