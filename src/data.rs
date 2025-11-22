@@ -273,17 +273,6 @@ impl PostOrder {
     }
 }
 
-#[derive(Debug, Serialize)]
-pub struct PostOrderBatch {
-    orders: Vec<PostOrder>,
-}
-
-impl PostOrderBatch {
-    pub fn new(orders: Vec<PostOrder>) -> Self {
-        PostOrderBatch { orders }
-    }
-}
-
 #[derive(Debug)]
 pub struct OrderArgs {
     pub token_id: String,
@@ -496,6 +485,7 @@ pub struct OrderResponse {
     pub success: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_msg: Option<String>,
+    #[serde(rename = "orderID")]
     pub order_id: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub order_hashes: Vec<String>,

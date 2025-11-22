@@ -1,3 +1,4 @@
+
 use alloy_primitives::hex::encode_prefixed;
 pub use alloy_primitives::U256;
 use alloy_signer::Signer;
@@ -364,6 +365,7 @@ impl ClobClient {
             .neg_risk)
     }
 
+    #[allow(unused)]
     async fn resolve_tick_size(
         &self,
         token_id: &str,
@@ -388,6 +390,7 @@ impl ClobClient {
 
     async fn get_filled_order_options(
         &self,
+        #[allow(unused)]
         token_id: &str,
         options: Option<&CreateOrderOptions>,
     ) -> ClientResult<CreateOrderOptions> {
@@ -542,7 +545,15 @@ impl ClobClient {
 
         let req = self.create_request_with_headers(method, endpoint, headers.into_iter());
 
-        Ok(req.json(&body).send().await?.json::<OrderResponse>().await?)
+        let response = req.json(&body).send().await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(anyhow!("Single order request failed with status {}: {}", status, text));
+        }
+
+        Ok(response.json::<OrderResponse>().await?)
     }
 
     pub async fn post_order_batch(
@@ -554,13 +565,14 @@ impl ClobClient {
         }
 
         let (signer, creds) = self.get_l2_parameters();
-        
+
         let post_orders: Vec<PostOrder> = orders
             .into_iter()
             .map(|(order, order_type)| PostOrder::new(order, creds.api_key.clone(), order_type))
             .collect();
 
-        let body = PostOrderBatch::new(post_orders);
+        // Send as direct array (not wrapped in an object)
+        let body = post_orders;
 
         let method = Method::POST;
         let endpoint = "/orders";
@@ -569,7 +581,15 @@ impl ClobClient {
 
         let req = self.create_request_with_headers(method, endpoint, headers.into_iter());
 
-        Ok(req.json(&body).send().await?.json::<BatchOrderResponse>().await?)
+        let response = req.json(&body).send().await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(anyhow!("Batch order request failed with status {}: {}", status, text));
+        }
+
+        Ok(response.json::<BatchOrderResponse>().await?)
     }
 
     pub async fn create_and_post_order(&self, order_args: &OrderArgs) -> ClientResult<OrderResponse> {
