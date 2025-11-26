@@ -450,7 +450,7 @@ pub struct Market {
 
     pub question_id: String,
     pub minimum_order_size: Decimal,
-    pub minimum_tick_size: Decimal,
+    pub minimum_tick_size: Decimal, // 0.01, 0.001
     pub description: String,
     pub category: Option<String>,
     pub end_date_iso: Option<String>,

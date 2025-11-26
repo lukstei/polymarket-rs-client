@@ -560,8 +560,8 @@ impl ClobClient {
         &self,
         orders: Vec<(SignedOrderRequest, OrderType)>,
     ) -> ClientResult<BatchOrderResponse> {
-        if orders.len() > 5 {
-            return Err(anyhow!("Maximum of 5 orders allowed per batch"));
+        if orders.len() > 15 {
+            return Err(anyhow!("Maximum of 15 orders allowed per batch"));
         }
 
         let (signer, creds) = self.get_l2_parameters();
