@@ -4,8 +4,6 @@ use anyhow::anyhow;
 use anyhow::{Context, Result};
 use rand::thread_rng;
 use rand::Rng;
-use rust_decimal::Decimal;
-use rust_decimal::RoundingStrategy::{AwayFromZero, MidpointTowardZero, ToZero};
 
 use serde::Serialize;
 
@@ -13,13 +11,18 @@ use crate::config::get_contract_config;
 use crate::eth_utils::sign_order_message;
 use crate::eth_utils::Order;
 use crate::utils::get_current_unix_time_secs;
-use crate::{
-    CreateOrderOptions, EthSigner, ExtraOrderArgs, MarketOrderArgs, OrderArgs, OrderSummary, Side,
-};
+use crate::{CreateOrderOptions, EthSigner, ExtraOrderArgs, MarketOrderArgs, OrderArgs, OrderSummary, Side};
 
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::LazyLock;
+
+// Fastnum imports
+use fastnum::{dec128, D128};
+use fastnum::decimal::RoundingMode;
+
+// Alias D128 to Decimal to minimize changes in other parts of the crate if needed
+pub type Decimal = D128;
 
 /// Signature type for different wallet configurations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -72,7 +75,7 @@ pub struct SignedOrderRequest {
 static ROUNDING_CONFIG: LazyLock<HashMap<Decimal, RoundConfig>> = LazyLock::new(|| {
     HashMap::from([
         (
-            Decimal::from_str("0.1").unwrap(),
+            dec128!(0.1),
             RoundConfig {
                 price: 1,
                 size: 2,
@@ -80,7 +83,7 @@ static ROUNDING_CONFIG: LazyLock<HashMap<Decimal, RoundConfig>> = LazyLock::new(
             },
         ),
         (
-            Decimal::from_str("0.01").unwrap(),
+            dec128!(0.01),
             RoundConfig {
                 price: 2,
                 size: 2,
@@ -88,7 +91,7 @@ static ROUNDING_CONFIG: LazyLock<HashMap<Decimal, RoundConfig>> = LazyLock::new(
             },
         ),
         (
-            Decimal::from_str("0.001").unwrap(),
+            dec128!(0.001),
             RoundConfig {
                 price: 3,
                 size: 2,
@@ -96,7 +99,7 @@ static ROUNDING_CONFIG: LazyLock<HashMap<Decimal, RoundConfig>> = LazyLock::new(
             },
         ),
         (
-            Decimal::from_str("0.0001").unwrap(),
+            dec128!(0.0001),
             RoundConfig {
                 price: 4,
                 size: 2,
@@ -107,11 +110,17 @@ static ROUNDING_CONFIG: LazyLock<HashMap<Decimal, RoundConfig>> = LazyLock::new(
 });
 
 fn decimal_to_token_u32(amt: Decimal) -> u32 {
-    let mut amt = Decimal::from_scientific("1e6").expect("1e6 is not scientific") * amt;
-    if amt.scale() > 0 {
-        amt = amt.round_dp_with_strategy(0, MidpointTowardZero);
+    let mut amt = dec128!(1e6) * amt;
+
+    if amt.fractional_digits_count() > 0 {
+        // RustDecimal: MidpointTowardZero (0.5 -> 0, 1.5 -> 1)
+        // Fastnum: HalfDown (0.5 -> 0, 1.5 -> 1, 0.6 -> 1) - Matches behavior for positive numbers
+        amt = amt.with_rounding_mode(RoundingMode::HalfDown).round(0);
     }
-    amt.try_into().expect("Couldn't round decimal to integer")
+
+    // Convert to string and parse is the safest cross-crate way for D128 -> u32
+    // alternatively use amt.digits() if it fits in u128/u32
+    amt.to_string().parse::<u32>().expect("Couldn't round decimal to integer")
 }
 
 impl OrderBuilder {
@@ -135,10 +144,19 @@ impl OrderBuilder {
     }
 
     fn fix_amount_rounding(&self, mut amt: Decimal, round_config: &RoundConfig) -> Decimal {
-        if amt.scale() > round_config.amount {
-            amt = amt.round_dp_with_strategy(round_config.amount + 4, AwayFromZero);
-            if amt.scale() > round_config.amount {
-                amt = amt.round_dp_with_strategy(round_config.amount, ToZero);
+        // Calculate number of significant digits in the coefficient
+        // .digits() returns the underlying integer coefficient
+        let digits_count = amt.digits().to_string().len();
+
+        if digits_count > round_config.amount as usize {
+            // RoundingMode::Up
+            amt = amt.with_rounding_mode(RoundingMode::Up).round((round_config.amount + 4) as i16);
+
+            // Check scale (fractional_digits_count)
+            // Note: fractional_digits_count returns i16, cast to avoid comparison issues
+            if amt.fractional_digits_count() > round_config.amount as i16 {
+                // ToZero -> RoundingMode::Down
+                amt = amt.with_rounding_mode(RoundingMode::Down).round(round_config.amount as i16);
             }
         }
         amt
@@ -151,11 +169,13 @@ impl OrderBuilder {
         price: Decimal,
         round_config: &RoundConfig,
     ) -> (u32, u32) {
-        let raw_price = price.round_dp_with_strategy(round_config.price, MidpointTowardZero);
+        // MidpointTowardZero -> RoundingMode::HalfDown
+        let raw_price = price.with_rounding_mode(RoundingMode::HalfDown).round(round_config.price as i16);
 
         match side {
             Side::BUY => {
-                let raw_taker_amt = size.round_dp_with_strategy(round_config.size, ToZero);
+                // ToZero -> RoundingMode::Down
+                let raw_taker_amt = size.with_rounding_mode(RoundingMode::Down).round(round_config.size as i16);
                 let raw_maker_amt = raw_taker_amt * raw_price;
                 let raw_maker_amt = self.fix_amount_rounding(raw_maker_amt, round_config);
                 (
@@ -164,7 +184,8 @@ impl OrderBuilder {
                 )
             }
             Side::SELL => {
-                let raw_maker_amt = size.round_dp_with_strategy(round_config.size, ToZero);
+                // ToZero -> RoundingMode::Down
+                let raw_maker_amt = size.with_rounding_mode(RoundingMode::Down).round(round_config.size as i16);
                 let raw_taker_amt = raw_maker_amt * raw_price;
                 let raw_taker_amt = self.fix_amount_rounding(raw_taker_amt, round_config);
 
@@ -182,8 +203,10 @@ impl OrderBuilder {
         price: Decimal,
         round_config: &RoundConfig,
     ) -> (u32, u32) {
-        let raw_maker_amt = amount.round_dp_with_strategy(round_config.size, ToZero);
-        let raw_price = price.round_dp_with_strategy(round_config.price, MidpointTowardZero);
+        // ToZero -> RoundingMode::Down
+        let raw_maker_amt = amount.with_rounding_mode(RoundingMode::Down).round(round_config.size as i16);
+        // MidpointTowardZero -> RoundingMode::HalfDown
+        let raw_price = price.with_rounding_mode(RoundingMode::HalfDown).round(round_config.price as i16);
 
         let raw_taker_amt = raw_maker_amt / raw_price;
 
@@ -200,7 +223,7 @@ impl OrderBuilder {
         positions: &[OrderSummary],
         amount_to_match: Decimal,
     ) -> Result<Decimal> {
-        let mut sum = Decimal::ZERO;
+        let mut sum = D128::ZERO;
 
         for p in positions {
             sum += p.size * p.price;

@@ -10,7 +10,6 @@ use orders::SignedOrderRequest;
 use reqwest::Client;
 use reqwest::Method;
 use reqwest::RequestBuilder;
-use rust_decimal::Decimal;
 pub use serde_json::Value;
 use std::collections::HashMap;
 
@@ -26,8 +25,11 @@ mod utils;
 
 pub use data::*;
 pub use eth_utils::EthSigner;
+use fastnum::D128;
 pub use orders::SigType;
 use headers::{create_l1_headers, create_l2_headers};
+
+pub type Decimal = D128;
 
 #[derive(Default)]
 pub struct ClobClient {

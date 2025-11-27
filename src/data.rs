@@ -98,17 +98,14 @@ pub struct OpenOrder {
     pub status: String,
     pub market: String,
 
-    #[serde(with = "rust_decimal::serde::str")]
     pub original_size: Decimal,
     pub outcome: String,
     pub maker_address: String,
     pub owner: String,
 
-    #[serde(with = "rust_decimal::serde::str")]
     pub price: Decimal,
     pub side: Side,
 
-    #[serde(with = "rust_decimal::serde::str")]
     pub size_matched: Decimal,
     pub asset_id: String,
     #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -300,9 +297,7 @@ pub struct MarketOrderArgs {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct OrderSummary {
-    #[serde(with = "rust_decimal::serde::str")]
     pub price: Decimal,
-    #[serde(with = "rust_decimal::serde::str")]
     pub size: Decimal,
 }
 
@@ -348,19 +343,16 @@ pub struct ApiKeysResponse {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct MidpointResponse {
-    #[serde(with = "rust_decimal::serde::str")]
     pub mid: Decimal,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct PriceResponse {
-    #[serde(with = "rust_decimal::serde::str")]
     pub price: Decimal,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct SpreadResponse {
-    #[serde(with = "rust_decimal::serde::str")]
     pub spread: Decimal,
 }
 

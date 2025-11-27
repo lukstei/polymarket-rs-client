@@ -20,7 +20,7 @@ anyhow = "1.0.93"
 serde = "1.0.215"
 serde_json = "1.0.133"
 reqwest = { version = "0.12.9", features = ["json"] }
-rust_decimal = { version = "1.36.0", features = ["serde-with-str"] }
+fastnum = { version = "0.7", features = ["serde"] } # enables the "serde" feature
 rand = "0.8.5"
 serde-json-fmt = "0.1.0"
 sha1 = "0.10.6"
