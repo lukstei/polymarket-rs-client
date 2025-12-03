@@ -1,4 +1,3 @@
-
 use alloy_primitives::hex::encode_prefixed;
 pub use alloy_primitives::U256;
 use alloy_signer::Signer;
@@ -12,7 +11,6 @@ use reqwest::Method;
 use reqwest::RequestBuilder;
 pub use serde_json::Value;
 use std::collections::HashMap;
-
 // #[cfg(test)]
 // mod tests;
 
@@ -26,8 +24,10 @@ mod utils;
 pub use data::*;
 pub use eth_utils::EthSigner;
 use fastnum::D128;
-pub use orders::SigType;
 use headers::{create_l1_headers, create_l2_headers};
+pub use orders::SigType;
+use serde::de::DeserializeOwned;
+use serde::{Serialize};
 
 pub type Decimal = D128;
 
@@ -392,8 +392,7 @@ impl ClobClient {
 
     async fn get_filled_order_options(
         &self,
-        #[allow(unused)]
-        token_id: &str,
+        #[allow(unused)] token_id: &str,
         options: Option<&CreateOrderOptions>,
     ) -> ClientResult<CreateOrderOptions> {
         let (tick_size, neg_risk) = match options {
@@ -401,7 +400,7 @@ impl ClobClient {
             None => (None, None),
         };
 
-        let tick_size = tick_size.unwrap();//self.resolve_tick_size(token_id, tick_size).await?;
+        let tick_size = tick_size.unwrap(); //self.resolve_tick_size(token_id, tick_size).await?;
 
         let neg_risk = neg_risk.unwrap();
 
@@ -552,16 +551,20 @@ impl ClobClient {
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            return Err(anyhow!("Single order request failed with status {}: {}", status, text));
+            return Err(anyhow!(
+                "Single order request failed with status {}: {}",
+                status,
+                text
+            ));
         }
 
         Ok(response.json::<OrderResponse>().await?)
     }
 
-    pub async fn post_order_batch(
+    pub async fn post_order_batch<T: DeserializeOwned>(
         &self,
         orders: Vec<(SignedOrderRequest, OrderType)>,
-    ) -> ClientResult<BatchOrderResponse> {
+    ) -> ClientResult<T> {
         if orders.len() > 15 {
             return Err(anyhow!("Maximum of 15 orders allowed per batch"));
         }
@@ -588,13 +591,20 @@ impl ClobClient {
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            return Err(anyhow!("Batch order request failed with status {}: {}", status, text));
+            return Err(anyhow!(
+                "Batch order request failed with status {}: {}",
+                status,
+                text
+            ));
         }
 
-        Ok(response.json::<BatchOrderResponse>().await?)
+        Ok(response.json::<T>().await?)
     }
 
-    pub async fn create_and_post_order(&self, order_args: &OrderArgs) -> ClientResult<OrderResponse> {
+    pub async fn create_and_post_order(
+        &self,
+        order_args: &OrderArgs,
+    ) -> ClientResult<OrderResponse> {
         let order = self.create_order(order_args, None, None, None).await?;
         self.post_order(order, OrderType::GTC).await
     }
@@ -608,7 +618,7 @@ impl ClobClient {
         }
 
         let mut signed_orders = Vec::new();
-        
+
         for (order_args, order_type) in orders_args {
             let signed_order = self.create_order(order_args, None, None, None).await?;
             signed_orders.push((signed_order, *order_type));
@@ -631,7 +641,7 @@ impl ClobClient {
         Ok(req.json(&body).send().await?.json::<Value>().await?)
     }
 
-    pub async fn cancel_orders(&self, order_ids: &[String]) -> ClientResult<Value> {
+    pub async fn cancel_orders<T: AsRef<str> + Serialize>(&self, order_ids: &[T]) -> ClientResult<Value> {
         let (signer, creds) = self.get_l2_parameters();
         let method = Method::DELETE;
         let endpoint = "/orders";
@@ -778,16 +788,16 @@ impl ClobClient {
 
         let mut output = Vec::new();
         while next_cursor != END_CURSOR {
-        let req = self
-            .http_client
+            let req = self
+                .http_client
                 .request(method.clone(), format!("{}{endpoint}", &self.host))
                 .query(&query_params)
                 .query(&[("next_cursor", &next_cursor)]);
 
-        let r = headers
+            let r = headers
                 .clone()
-            .into_iter()
-            .fold(req, |r, (k, v)| r.header(k, v));
+                .into_iter()
+                .fold(req, |r, (k, v)| r.header(k, v));
 
             let resp = r.send().await?.json::<Value>().await?;
             let new_cursor = resp["next_cursor"]
@@ -944,7 +954,10 @@ impl ClobClient {
             .await?)
     }
 
-    pub async fn get_sampling_markets(&self, next_cursor: Option<&str>) -> ClientResult<MarketsResponse> {
+    pub async fn get_sampling_markets(
+        &self,
+        next_cursor: Option<&str>,
+    ) -> ClientResult<MarketsResponse> {
         let next_cursor = next_cursor.unwrap_or(INITIAL_CURSOR);
 
         Ok(self
