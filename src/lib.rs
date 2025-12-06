@@ -530,11 +530,11 @@ impl ClobClient {
             .create_market_order(chain_id, order_args, price, &extras, create_order_options)
     }
 
-    pub async fn post_order(
+    pub async fn post_order<T: DeserializeOwned>(
         &self,
         order: SignedOrderRequest,
         order_type: OrderType,
-    ) -> ClientResult<OrderResponse> {
+    ) -> ClientResult<T> {
         let (signer, creds) = self.get_l2_parameters();
         // Use API key as owner (as per original implementation)
         let body = PostOrder::new(order, creds.api_key.clone(), order_type);
@@ -558,7 +558,7 @@ impl ClobClient {
             ));
         }
 
-        Ok(response.json::<OrderResponse>().await?)
+        Ok(response.json::<T>().await?)
     }
 
     pub async fn post_order_batch<T: DeserializeOwned>(
