@@ -4,7 +4,7 @@ use crate::SignedOrderRequest;
 use alloy_primitives::U256;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
-use std::fmt::Display;
+use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 const ZERO_ADDRESS: &str = "0x0000000000000000000000000000000000000000";
@@ -366,7 +366,7 @@ pub struct NegRiskResponse {
     pub neg_risk: bool,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, Hash, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum OrderType {
     GTC,
     FOK,
@@ -385,10 +385,23 @@ impl OrderType {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, Hash, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub enum Side {
     BUY = 0,
     SELL = 1,
+}
+
+impl Display for Side {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Side::BUY => "BUY",
+                Side::SELL => "SELL",
+            }
+        )
+    }
 }
 
 impl Side {
